@@ -1,36 +1,183 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SHAARP Scraper IA
 
-## Getting Started
+## Contexte du projet
 
-First, run the development server:
+**Challenge 48h — Exhibition Scraper Agent**
+
+Cette demande provient du client **SHAARP** et constitue le sujet du challenge. Le projet est un exercice de hackathon sur 2 jours destiné à des équipes de développeurs juniors. L'objectif est de produire une application complète, même simple, et pas uniquement un enchaînement de prompts.
+
+Le but : concevoir un agent IA conversationnel capable de scraper la liste des exposants d'un salon professionnel à partir d'une URL, puis d'afficher les résultats dans un tableau interactif téléchargeable.
+
+## Sommaire
+
+- [Installation](#installation)
+- [Fonctionnalités détaillées](#fonctionnalités-détaillées)
+  - [Chat conversationnel](#chat-conversationnel)
+  - [Agent IA avec tools](#agent-ia-avec-tools)
+  - [Streaming temps réel](#streaming-temps-réel)
+  - [Tableau de résultats](#tableau-de-résultats)
+  - [Export](#export)
+- [Particularités techniques](#particularités-techniques)
+  - [Stack imposée](#stack-imposée)
+  - [Contraintes techniques](#contraintes-techniques)
+- [Architecture](#architecture-du-projet)
+- [Commandes](#commandes)
+- [Usage](#usage)
+- [URLs de test](#urls-de-test)
+- [Notes de cadrage](#notes-de-cadrage)
+- [Conclusion](#conclusion)
+
+## Objectif pédagogique
+
+Le projet vise à démontrer :
+- une application fonctionnelle avec front et back
+- une logique de conception claire
+- une structuration du projet cohérente
+- une UX conversationnelle
+
+## Description
+
+**SHAARP Scraper IA** est un agent IA qui :
+- comprend l'URL fournie par l'utilisateur
+- analyse la structure du site
+- extrait une liste d'exposants
+- affiche les résultats dans un tableau triable et filtrable
+- propose un export CSV
+
+## Particularités techniques
+
+### Stack imposée
+
+- `Next.js` (App Router)
+- `Vercel AI SDK` (agent avec tools)
+- `shadcn/ui` + `TailwindCSS`
+- `Playwright` pour le scraping
+
+## Fonctionnalités attendues
+
+1. Chat conversationnel
+   - interaction avec l'utilisateur
+   - possibilité d'affiner les demandes
+
+2. Agent IA avec tools
+   - navigation web
+   - analyse HTML
+   - extraction structurée
+   - gestion de la pagination
+
+3. Streaming temps réel
+   - affichage de la progression
+
+4. Tableau de résultats
+   - affichage structuré
+   - tri et recherche
+
+5. Export
+   - CSV (possible extension vers XLSX)
+
+## Données extraites
+
+Le scraper cible notamment les informations suivantes :
+- Nom
+- Description
+- Site web
+- Logo
+- Stand / emplacement
+- Pays
+- LinkedIn
+- Twitter / X
+- Catégories / tags
+- Email
+- Téléphone
+
+## Contraintes techniques
+
+- Scraper générique multi-sites
+- Utilisation du LLM pour comprendre la structure de la page
+- Rate limiting (1–2 secondes entre requêtes)
+- Gestion des erreurs (timeout, anti-bot, etc.)
+
+## URLs de test
+
+- `https://www.mwcbarcelona.com/exhibitors`
+- `https://www.vivatechnology.com/exhibitors`
+- `https://vancouver.websummit.com/startups/featured-startups/`
+
+## Architecture du projet
+
+```text
+project/
+├── package.json                 # Dépendances et scripts
+├── README.md                    # Documentation du projet
+└── src/
+    ├── app/
+    │   ├── page.tsx                 # Interface principale
+    │   └── api/
+    │       └── chat/
+    │           └── route.ts         # API backend IA + scraping
+    ├── components/
+    │   ├── Chat.tsx                 # Interface de chat conversationnel
+    │   ├── ExhibitorsTable.tsx      # Affichage des résultats
+    │   └── ScrapeProgress.tsx       # Suivi de l'avancement
+    └── lib/
+        ├── tools/
+        │   └── scrapeExhibitors.ts  # Logique de scraping et extraction
+        ├── schema.ts                # Schémas de validation Zod
+        └── utils.ts                 # Fonctions utilitaires
+```
+
+## Installation
+
+1. Installer les dépendances :
+
+```bash
+npm install
+```
+
+2. Installer Chromium pour Playwright :
+
+```bash
+npx playwright install chromium
+```
+
+3. Configurer les variables d'environnement :
+
+Créer un fichier `.env.local` puis ajouter :
+
+```env
+OPENAI_API_KEY=your_api_key_here
+```
+
+## Commandes
+
+Démarrer le projet en local :
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Ouvrir ensuite :
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```text
+http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Usage
 
-## Learn More
+1. Saisir l'URL du salon dans le chat.
+2. Laisser l'agent analyser le site.
+3. Suivre l'avancement de l'extraction.
+4. Consulter le tableau des exposants.
+5. Télécharger les résultats au format CSV.
 
-To learn more about Next.js, take a look at the following resources:
+## Notes de cadrage
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Le scraping reste un sujet sensible. Il est important de réfléchir aux aspects suivants :
+- conditions d'utilisation des sites
+- RGPD
+- légalité du scraping
+- alternatives (API officielles, open data)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Conclusion
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Ce projet respecte le cahier des charges du hackathon en offrant une application complète, un agent IA conversationnel, un backend de scraping et une interface de visualisation des résultats. Le README détaille la conception, l'usage et les contraintes techniques du projet.
