@@ -1,0 +1,203 @@
+================================================================================
+                        PRÉSENTATION ORALE — EXPOSCAN
+              Agent IA d'extraction automatique d'exposants de salons
+================================================================================
+
+
+INTRODUCTION (30s)
+──────────────────
+
+Bonjour, on va vous présenter ExpoScan, une application web qui permet
+d'extraire automatiquement les informations des exposants d'un salon
+professionnel à partir d'une simple URL.
+
+Concrètement, l'utilisateur colle un lien vers la page d'un salon,
+et notre agent IA va scraper le site, identifier chaque exposant,
+et structurer toutes les données dans un tableau exportable en Excel ou CSV.
+
+
+================================================================================
+
+PROBLÉMATIQUE (20s)
+───────────────────
+
+Quand on veut prospecter ou faire de la veille sur un salon professionnel,
+récupérer manuellement les infos de dizaines voire centaines d'exposants
+c'est extrêmement chronophage : nom, site web, stand, pays, réseaux sociaux...
+
+Notre solution automatise tout ce processus grâce à l'intelligence artificielle.
+
+
+================================================================================
+
+STACK TECHNIQUE (45s)
+─────────────────────
+
+Côté Frontend :
+  - Next.js 16 avec l'App Router — c'est notre framework React full-stack
+  - React 19 pour l'interface utilisateur
+  - Tailwind CSS 4 pour le styling
+  - Shadcn UI / Radix UI pour les composants (boutons, cartes, badges...)
+  - Vercel AI SDK (useChat) pour le streaming temps réel avec l'IA
+
+Côté Backend / IA :
+  - Next.js API Routes — une seule route serveur : /api/chat
+  - OpenAI GPT-4.1 pour l'orchestration de l'agent (il décide quoi scraper)
+  - OpenAI GPT-4.1-nano pour l'extraction structurée des données
+  - Firecrawl pour le web scraping (convertit les pages en markdown)
+  - Zod pour la validation des schémas de données
+
+Export :
+  - Librairie XLSX pour générer des fichiers Excel
+  - Export CSV natif avec encodage UTF-8 compatible Excel
+
+
+================================================================================
+
+ARCHITECTURE DU PROJET (30s)
+────────────────────────────
+
+L'architecture est simple et efficace :
+
+  app/page.tsx          →  L'interface principale : sidebar de chat + tableau
+  app/api/chat/route.ts →  Le cœur du moteur : IA + scraping + outils
+  components/           →  Composants UI réutilisables (thème, boutons, cartes)
+  lib/utils.ts          →  Utilitaires partagés
+
+C'est une architecture mono-page avec un seul endpoint API.
+Toute la logique métier est concentrée dans la route /api/chat.
+
+
+================================================================================
+
+CHEMIN DE DONNÉES — COMMENT ÇA MARCHE (1min30)
+───────────────────────────────────────────────
+
+Le flux de données se décompose en 4 grandes étapes :
+
+
+ÉTAPE 1 — Entrée utilisateur
+   L'utilisateur saisit l'URL d'un salon dans le chat.
+   Le hook useChat de Vercel AI SDK envoie cette URL à notre API.
+
+
+ÉTAPE 2 — Orchestration IA (côté serveur)
+   GPT-4.1 reçoit le message et dispose de 3 outils :
+
+   a) map_site : Phase de découverte
+      → Firecrawl cartographie le site et découvre toutes les URLs
+      → Les URLs sont stockées dans une file d'attente côté serveur
+
+   b) process_batch : Phase d'extraction (en boucle)
+      → Traite les URLs par lots de 5
+      → Pour chaque URL :
+         1. Firecrawl scrape la page et la convertit en markdown
+         2. On pré-extrait la localisation (Hall, Stand, Booth) par regex
+         3. On pré-extrait les réseaux sociaux (LinkedIn, Twitter)
+         4. GPT-4.1-nano transforme tout ça en objet JSON structuré via Zod
+      → Dédoublonnage automatique par URL et par nom d'entreprise
+      → L'agent boucle jusqu'à avoir traité toutes les URLs
+
+   c) scrape_page : Scraping unitaire
+      → Pour l'exploration initiale ou les pages listes
+
+
+ÉTAPE 3 — Streaming vers le client
+   Les données sont streamées en temps réel pendant l'extraction.
+   Les exposants sont envoyés dans des balises XML <exhibitors>[JSON]</exhibitors>
+   Le client parse ces blocs au fur et à mesure avec une regex.
+   Dédoublonnage côté client aussi, par nom d'entreprise.
+
+
+ÉTAPE 4 — Affichage et export
+   Les exposants s'affichent dans un tableau interactif avec :
+   - Filtrage en temps réel sur tous les champs
+   - Tri par colonnes (ascendant / descendant)
+   - 10 colonnes : nom, description, site web, stand, pays, LinkedIn,
+     Twitter, catégories, email, téléphone
+   - Export en un clic : CSV ou Excel (.xlsx)
+
+
+================================================================================
+
+SCHÉMA DE DONNÉES (20s)
+───────────────────────
+
+Chaque exposant est structuré avec ce schéma validé par Zod :
+
+  - Nom de l'entreprise
+  - Description de l'activité
+  - Site web officiel
+  - URL du logo
+  - Emplacement du stand (Hall / Stand)
+  - Pays
+  - LinkedIn
+  - Twitter / X
+  - Catégories / secteurs
+  - Email de contact
+  - Téléphone
+
+
+================================================================================
+
+POINTS TECHNIQUES INTÉRESSANTS (45s)
+─────────────────────────────────────
+
+1. Double dédoublonnage
+   → Côté serveur : par URL ET par nom d'entreprise
+   → Côté client : par nom (pour éviter les doublons entre lots)
+
+2. Gestion du contexte IA
+   → On fait du "message trimming" : on garde le message système,
+     le premier message utilisateur, et les 6 derniers messages
+   → Ça évite de dépasser la fenêtre de contexte du modèle
+
+3. Anti rate-limiting
+   → Délai de 1,5 seconde entre chaque URL scrapée
+   → Ça respecte les limites de l'API Firecrawl
+
+4. État serveur par closure
+   → La file d'URLs et les compteurs persistent entre les appels d'outils
+     grâce aux closures JavaScript
+   → Réinitialisation automatique à chaque nouvelle conversation
+
+5. Streaming temps réel
+   → L'utilisateur voit les résultats arriver progressivement
+   → Pas besoin d'attendre la fin de l'extraction complète
+
+
+================================================================================
+
+INTERFACE UTILISATEUR (20s)
+───────────────────────────
+
+L'interface est en deux colonnes :
+  - À gauche : un chat de 420px avec l'agent IA
+  - À droite : le tableau des résultats qui se remplit en temps réel
+
+On a aussi :
+  - Un mode sombre / clair
+  - Des indicateurs visuels pendant le scraping (spinners, statuts des outils)
+  - Des statistiques : nombre de pays uniques, nombre de secteurs
+
+
+================================================================================
+
+CONCLUSION (20s)
+────────────────
+
+En résumé, ExpoScan c'est un agent IA autonome qui :
+  1. Découvre automatiquement les pages d'exposants d'un salon
+  2. Extrait et structure les données de chaque exposant
+  3. Affiche tout dans un tableau filtrable et triable
+  4. Permet l'export en Excel ou CSV en un clic
+
+Le tout en temps réel, avec du streaming, et sans intervention manuelle
+au-delà de coller l'URL initiale.
+
+Merci, est-ce que vous avez des questions ?
+
+
+================================================================================
+                           DURÉE ESTIMÉE : ~5 minutes
+================================================================================

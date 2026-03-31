@@ -47,16 +47,59 @@ async function extractExhibitorFromPage(
 ): Promise<z.infer<typeof ExhibitorSchema> | null> {
   try {
     const scrapeResult = await firecrawl.scrape(url, {
-      formats: ["markdown"],
+      formats: ["markdown", "links"],
       waitFor: 3000,
-      onlyMainContent: true,
+      onlyMainContent: false,
     });
 
     const markdown = scrapeResult.markdown ?? "";
     if (!markdown || markdown.length < 50) return null;
 
-    const content =
-      markdown.length > 6000 ? markdown.substring(0, 6000) : markdown;
+    // Extract location-related lines first to ensure they're included
+    const lines = markdown.split("\n");
+    const locationLines: string[] = [];
+    const locationPatterns = /\b(hall|stand|booth|pavillon|square|village|level|floor|area|location|emplacement|congress|fira|gran via)\b/i;
+    for (const line of lines) {
+      if (locationPatterns.test(line)) {
+        locationLines.push(line.trim());
+      }
+    }
+    const locationBlock = locationLines.length > 0
+      ? "\n\n--- LOCATION INFO FOUND ON PAGE ---\n" + locationLines.slice(0, 15).join("\n")
+      : "";
+
+    // Pre-extract social media URLs from BOTH the links array and markdown text
+    // The links array catches icon-only <a> tags that markdown misses
+    const pageLinks: string[] = (scrapeResult as Record<string, unknown>).links
+      ? ((scrapeResult as Record<string, unknown>).links as string[])
+      : [];
+    const urlRegex = /https?:\/\/[^\s\)\]"'>]+/g;
+    const markdownUrls = markdown.match(urlRegex) ?? [];
+    const allUrls = [...pageLinks, ...markdownUrls];
+
+    let linkedinUrl = "";
+    let twitterUrl = "";
+    for (const u of allUrls) {
+      const lower = u.toLowerCase();
+      if (!linkedinUrl && lower.includes("linkedin.com")) {
+        linkedinUrl = u.replace(/[),.\]]+$/, "");
+      }
+      if (!twitterUrl && (lower.includes("twitter.com") || lower.includes("x.com/"))) {
+        twitterUrl = u.replace(/[),.\]]+$/, "");
+      }
+      if (linkedinUrl && twitterUrl) break;
+    }
+
+    const socialBlock = (linkedinUrl || twitterUrl)
+      ? "\n\n--- SOCIAL MEDIA URLS FOUND ON PAGE ---\n"
+        + (linkedinUrl ? "LinkedIn: " + linkedinUrl + "\n" : "")
+        + (twitterUrl ? "Twitter/X: " + twitterUrl + "\n" : "")
+      : "";
+
+    const mainContent =
+      markdown.length > 8000 ? markdown.substring(0, 8000) : markdown;
+
+    const content = mainContent + locationBlock + socialBlock;
 
     const { object } = await generateObject({
       model: openai("gpt-4.1-nano"),
@@ -64,11 +107,22 @@ async function extractExhibitorFromPage(
       prompt: `Extrais les données de cet exposant depuis le contenu markdown ci-dessous.
 Règles :
 - site_web = site OFFICIEL de l'entreprise (PAS l'URL du salon, PAS un réseau social)
-- stand = emplacement COMPLET tel qu'affiché sur la page. Inclure le lieu, hall, pavillon, square, numéro de stand, etc. Exemples valides : "Hall 3 - Stand 3K30", "Congress Square Stand CS96", "Hall 5 Stand 5A12", "Fira Gran Via, Hall 2, 2D40", "South Village SV10". Copie EXACTEMENT le texte de localisation trouvé.
-- RÉSEAUX SOCIAUX — Détecte les liens par leur domaine :
-  * linkedin = tout lien contenant "linkedin.com" → champ linkedin
-  * twitter = tout lien contenant "twitter.com" ou "x.com" → champ twitter
-  * facebook, instagram, youtube, tiktok, etc. → ignore
+- stand / location = L'EMPLACEMENT PHYSIQUE de l'exposant au salon. C'est CRITIQUE.
+  Cherche dans TOUT le contenu, y compris les menus, sidebars, badges, métadonnées.
+  Mots-clés à repérer : "Hall", "Stand", "Booth", "Congress Square", "Fira Gran Via", "Village", "Pavilion", "Level", "Area", codes alphanumériques (ex: CS96, 3K30, 5A12, 2D40).
+  Exemples de formats valides :
+  - "Hall 3 - Stand 3K30"
+  - "Congress Square Stand CS96"
+  - "Fira Gran Via, Hall 2, 2D40"
+  - "South Village SV10"
+  - "Hall 8.1 Stand B22"
+  Si une section "LOCATION INFO" est fournie en bas, utilise-la en priorité.
+  Copie le texte de localisation EXACTEMENT comme trouvé.
+- RÉSEAUX SOCIAUX — CRITIQUE : utilise la section "SOCIAL MEDIA URLS" en bas si elle existe.
+  Sinon, cherche dans le contenu les URLs contenant ces domaines :
+  * linkedin.com → champ linkedin (URL complète)
+  * twitter.com ou x.com → champ twitter (URL complète)
+  * facebook, instagram, youtube, tiktok → ignore
   Les liens réseaux sociaux ne sont PAS des sites web officiels.
 - Si un champ est introuvable, retourne ""
 - Retourne exactement 1 exposant dans le tableau
