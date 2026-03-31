@@ -80,7 +80,7 @@ export function Chat({ messages, sendMessage, isLoading }: ChatProps) {
           <Input 
             value={inputValue} 
             onChange={(e) => setInputValue(e.target.value)} 
-            placeholder="Entrez une URL (ex: https://...)" 
+            placeholder="Collez l'URL d'un salon ou donnez une consigne..." 
             className="flex-1"
           />
           <Button type="submit" size="icon" disabled={isLoading || inputValue.length === 0}>

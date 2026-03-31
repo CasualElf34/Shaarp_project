@@ -209,28 +209,77 @@ export default function Home() {
     }
   }, [messages]);
 
+  const exhibitorCount = exhibitors.length;
+  const countryCount = 0;
+  const sectorCount = 0;
+
   return (
-    <div className="flex h-screen w-full flex-col bg-background text-foreground md:flex-row font-sans">
-      <div className="flex w-full flex-col border-r border-border md:h-full md:w-[400px] lg:w-[450px] overflow-hidden">
-        <div className="flex h-16 items-center border-b px-6 bg-muted/30 shrink-0">
-          <h1 className="text-xl font-bold tracking-tight text-primary">Shaarp Scraper AI</h1>
-        </div>
-        <Chat 
-           messages={messages} 
-           sendMessage={sendMessage}
-           isLoading={isLoading} 
-        />
-      </div>
-      <div className="flex flex-1 flex-col overflow-hidden bg-muted/10">
-        {progress.active && (
-          <ScrapeProgress 
-            status={progress.status}
-            current={progress.current}
-            total={progress.total}
-            phase={progress.phase}
-          />
-        )}
-        <ExhibitorsTable exhibitors={exhibitors} />
+    <div className="min-h-screen bg-slate-100 text-slate-900">
+      <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+        <section className="rounded-[32px] border border-slate-200 bg-white px-6 py-8 shadow-sm">
+          <div className="flex flex-col gap-8 xl:flex-row xl:items-center xl:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-indigo-600">
+                Agent IA · Scraping · Tableau interactif · Export CSV
+              </div>
+              <h1 className="mt-6 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
+                Tout ce sur quoi vous perdiez du temps... <span className="text-indigo-600">déjà prêt avec ExpoScan.</span>
+              </h1>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
+                Une interface élégante pour dialoguer avec l’agent IA, lancer l’extraction d’exposants et exploiter immédiatement les données dans un tableau interactif.
+              </p>
+            </div>
+
+            <div className="grid w-full gap-4 sm:grid-cols-3 xl:w-auto">
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4">
+                <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Exposants</p>
+                <p className="mt-3 text-3xl font-semibold text-slate-950">{exhibitorCount}</p>
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4">
+                <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Pays</p>
+                <p className="mt-3 text-3xl font-semibold text-slate-950">{countryCount}</p>
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4">
+                <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Secteurs</p>
+                <p className="mt-3 text-3xl font-semibold text-slate-950">{sectorCount}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <main className="mt-6 grid gap-6 lg:grid-cols-[420px_1fr]">
+          <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Agent IA</p>
+                <h2 className="mt-2 text-xl font-semibold text-slate-950">Conversation et pilotage de l’extraction</h2>
+              </div>
+            </div>
+            <div className="h-[640px] overflow-hidden rounded-[28px] border border-slate-200 bg-slate-50">
+              <Chat
+                messages={messages}
+                sendMessage={sendMessage}
+                isLoading={isLoading}
+              />
+            </div>
+          </section>
+
+          <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Résultats</p>
+                <h2 className="text-xl font-semibold text-slate-950">Tableau interactif généré à partir des données extraites</h2>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-600">
+                <span className="h-2 w-2 rounded-full bg-indigo-500" /> {exhibitorCount} exposant{exhibitorCount > 1 ? 's' : ''}
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
+              <ExhibitorsTable exhibitors={exhibitors} />
+            </div>
+          </section>
+        </main>
       </div>
     </div>
   );

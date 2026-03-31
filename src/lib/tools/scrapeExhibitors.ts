@@ -24,6 +24,24 @@ async function autoScroll(page: Page) {
   });
 }
 
+function findFirstHref(anchors: Array<{ href: string; text: string }>, pattern: RegExp): string | undefined {
+  return anchors.find(({ href }) => pattern.test(href))?.href;
+}
+
+function findBestWebsite(anchors: Array<{ href: string; text: string }>, currentUrl: string): string | undefined {
+  const currentOrigin = new URL(currentUrl).origin;
+  return anchors
+    .filter(({ href }) => /^https?:\/\//i.test(href))
+    .filter(({ href }) => !/(linkedin\.com|twitter\.com|x\.com|facebook\.com|instagram\.com|youtube\.com|youtu\.be|mailto:|tel:)/i.test(href))
+    .find(({ href }) => {
+      try {
+        return new URL(href).origin !== currentOrigin;
+      } catch {
+        return true;
+      }
+    })?.href;
+}
+
 // ========================================
 // Phase 1: Collect exhibitor links + pagination
 // ========================================
@@ -137,30 +155,59 @@ async function scrapeExhibitorDetail(
 ): Promise<Exhibitor | null> {
   const page = await context.newPage();
   try {
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 20000 });
-    await randomDelay(500, 1000);
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
+    await randomDelay(800, 1500);
 
-    const pageText = await page.evaluate(() => {
+    const pageData = await page.evaluate(() => {
       document.querySelectorAll('script, style, noscript, svg, iframe').forEach(el => el.remove());
       const main = document.querySelector('main') || document.querySelector('#content') || document.querySelector('article') || document.body;
-      return main.innerText.substring(0, 30000);
+      const text = (main?.innerText || document.body.innerText || '').substring(0, 40000);
+      const anchors = Array.from(document.querySelectorAll('a[href]')).map((a) => ({
+        href: (a as HTMLAnchorElement).href,
+        text: (a.textContent || '').trim().replace(/\s+/g, ' '),
+      })).filter(({ href }) => href);
+      return { text, anchors };
     });
 
-    if (!pageText || pageText.trim().length < 50) {
-      return { name: fallbackName, website: '', booth: '', linkedin: '', twitter: '', email: '', phone: '' };
+    const anchorPreview = pageData.anchors.slice(0, 80).map((anchor) => `- ${anchor.text || '[link]'} › ${anchor.href}`).join('\n');
+    const directWebsite = findBestWebsite(pageData.anchors, url);
+    const directLinkedin = findFirstHref(pageData.anchors, /linkedin\.com/i);
+    const directTwitter = findFirstHref(pageData.anchors, /(twitter\.com|x\.com)/i);
+    const directEmail = findFirstHref(pageData.anchors, /^mailto:/i)?.replace(/^mailto:/i, '');
+    const directPhone = findFirstHref(pageData.anchors, /^tel:/i)?.replace(/^tel:/i, '');
+
+    if (!pageData.text || pageData.text.trim().length < 50) {
+      return {
+        name: fallbackName,
+        website: directWebsite || '',
+        booth: '',
+        linkedin: directLinkedin || '',
+        twitter: directTwitter || '',
+        email: directEmail || '',
+        phone: directPhone || '',
+      };
     }
 
     const { object } = await generateObject({
       model: openai.chat('gpt-4.1-mini'),
       schema: zodSchema(singleExhibitorProcessSchema),
-      prompt: `Voici le contenu d'une fiche exposant. TA MISSION : Extraire UNIQUEMENT les COORDONNÉES DE CONTACT (email, téléphone, site web, booth, réseaux sociaux). 
+      prompt: `Voici le contenu d'une fiche exposant. TA MISSION : Extraire UNIQUEMENT les COORDONNÉES DE CONTACT (email, téléphone, site web, booth, réseaux sociaux).
 
-IMPORTANT : Ne perds pas de temps avec les descriptions, l'historique de l'entreprise ou les présentations marketing. Ignore tout ce qui n'est pas un contact direct.
+IMPORTANT : Ne fournis que le nom, le site officiel, le numéro de stand, LinkedIn, Twitter/X, l'email et le téléphone. Si un champ n'existe pas, laisse-le vide.
 
-Utilise "${fallbackName}" si le nom n'est pas clair. Contenu :\n\n${pageText}`,
+Contenu visible :\n${pageData.text}\n\nLiens détectés sur la page :\n${anchorPreview}`,
     });
 
-    return object.exhibitor;
+    return {
+      name: object.exhibitor.name || fallbackName,
+      website: object.exhibitor.website || directWebsite || '',
+      booth: object.exhibitor.booth || '',
+      linkedin: object.exhibitor.linkedin || directLinkedin || '',
+      twitter: object.exhibitor.twitter || directTwitter || '',
+      email: object.exhibitor.email || directEmail || '',
+      phone: object.exhibitor.phone || directPhone || '',
+    };
   } catch (error: any) {
     console.warn(`[detail] Erreur sur ${url}: ${error.message}`);
     return { name: fallbackName, website: url, booth: '', linkedin: '', twitter: '', email: '', phone: '' };
